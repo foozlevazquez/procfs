@@ -132,10 +132,31 @@ func (ms *MemStat) fillMemStat(r *bufio.Reader) error {
 	}
 
 	for _, e := range entries {
+		var line string
+		var err error
+		// Skip unknown entries
+		for {
+			line, err = r.ReadString('\n')
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error reading %q line: %v",
+					e.fmt, err))
+			}
+			if strings.HasPrefix(line, e.fmt + ":") {
+				break
+			}
+			if strings.HasPrefix(line, "VmFlags:") {
+				// Gone too far, error.
+				return errors.New(fmt.Sprintf("Never reached %q line",
+					e.fmt))
+			}
+			//fmt.Printf("Skipping %q (unmatched %q)\n", line, e.fmt + ":")
+		}
+
 		_fmt := fmt.Sprintf("%-16s%%8d kB\n", e.fmt + ":")
-		_, err := fmt.Fscanf(r, _fmt, e.ptr)
+		_, err = fmt.Sscanf(line, _fmt, e.ptr)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Error parsing: %q: %v", e.fmt, err))
+			return errors.New(fmt.Sprintf("Line: %q: Error parsing: %q: %v",
+				line, e.fmt, err))
 		}
 	}
 	line, err := r.ReadString('\n')
